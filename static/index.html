@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocQuery — Document Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a26;
+    --border: #2a2a3d;
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --accent3: #ff6b6b;
+    --text: #e8e8f0;
+    --muted: #7a7a9a;
+    --success: #00d4aa;
+    --error: #ff6b6b;
+    --warning: #ffcc44;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Sora', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(108,99,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(108,99,255,0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .glow-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .glow-orb.one { width: 500px; height: 500px; background: rgba(108,99,255,0.12); top: -100px; left: -100px; }
+  .glow-orb.two { width: 400px; height: 400px; background: rgba(0,212,170,0.08); bottom: -80px; right: -80px; animation-delay: -6s; }
+  @keyframes drift { from { transform: translate(0,0) scale(1); } to { transform: translate(30px, 20px) scale(1.05); } }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 52px;
+    animation: fadeUp 0.6s ease both;
+  }
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+  .logo-badge .dot { width: 6px; height: 6px; background: var(--accent2); border-radius: 50%; animation: pulse 2s ease infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #fff 0%, #a8a4ff 50%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+  header p {
+    color: var(--muted);
+    font-size: 1rem;
+    font-weight: 300;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 20px;
+    animation: fadeUp 0.6s ease both;
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: rgba(108,99,255,0.4); }
+  .card-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* API Key */
+  .input-group { display: flex; gap: 10px; align-items: center; }
+  .styled-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .styled-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,0.15); }
+  .styled-input::placeholder { color: var(--muted); }
+
+  select.styled-input { cursor: pointer; }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(108,99,255,0.05);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .upload-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    display: block;
+    filter: grayscale(0.5);
+    transition: transform 0.3s;
+  }
+  .upload-zone:hover .upload-icon { transform: translateY(-4px); filter: grayscale(0); }
+  .upload-zone h3 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+  .upload-zone p { color: var(--muted); font-size: 0.85rem; }
+  .file-types {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .file-type-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* Doc info */
+  .doc-info {
+    display: none;
+    background: var(--surface2);
+    border: 1px solid var(--accent2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-top: 14px;
+    font-size: 0.85rem;
+  }
+  .doc-info.visible { display: flex; align-items: flex-start; gap: 12px; }
+  .doc-info .icon { font-size: 1.3rem; flex-shrink: 0; }
+  .doc-info .meta strong { color: var(--accent2); display: block; margin-bottom: 4px; }
+  .doc-info .meta .preview { color: var(--muted); font-size: 0.78rem; font-family: 'Space Mono', monospace; line-height: 1.5; }
+
+  /* Query section */
+  textarea.styled-input {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(108,99,255,0.35);
+  }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(108,99,255,0.5); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-sm {
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  .row { display: flex; gap: 12px; align-items: flex-start; margin-top: 14px; }
+
+  /* Status */
+  .status-bar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    margin-top: 14px;
+  }
+  .status-bar.visible { display: flex; }
+  .status-bar.loading { background: rgba(108,99,255,0.1); border: 1px solid rgba(108,99,255,0.3); color: var(--accent); }
+  .status-bar.error { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3); color: var(--error); }
+  .status-bar.success { background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); color: var(--success); }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(108,99,255,0.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Results Table */
+  .results-section { animation: fadeUp 0.5s ease both; }
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .results-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 12px;
+  }
+  .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  thead { background: var(--surface2); }
+  th {
+    padding: 14px 18px;
+    text-align: left;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(42,42,61,0.6);
+    vertical-align: top;
+    line-height: 1.6;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: rgba(26,26,38,0.4); }
+  tr { transition: background 0.15s; }
+  tr:hover td { background: rgba(108,99,255,0.05); }
+  .td-query { font-weight: 600; color: var(--text); max-width: 220px; }
+  .td-answer { color: #c8c8da; max-width: 420px; }
+  .td-model {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .td-tokens {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* Verdict badge */
+  .verdict-cell { text-align: center; }
+  .verdict-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Space Mono', monospace;
+    border: 1.5px solid transparent;
+  }
+  .verdict-badge.correct { background: rgba(0,212,170,0.15); border-color: rgba(0,212,170,0.4); color: var(--success); }
+  .verdict-badge.incorrect { background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.4); color: var(--error); }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    margin-top: 16px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 0.82rem;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { font-family: 'Space Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+  .stat-value { font-weight: 700; font-size: 1.1rem; }
+  .stat-value.green { color: var(--success); }
+  .stat-value.red { color: var(--error); }
+  .stat-value.blue { color: var(--accent); }
+  .stat-value.yellow { color: var(--warning); }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card:nth-child(1) { animation-delay: 0.05s; }
+  .card:nth-child(2) { animation-delay: 0.12s; }
+  .card:nth-child(3) { animation-delay: 0.19s; }
+  .card:nth-child(4) { animation-delay: 0.26s; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .empty-state .emoji { font-size: 2rem; display: block; margin-bottom: 10px; }
+
+  .row-flex { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  @media (max-width: 600px) {
+    .row { flex-direction: column; }
+    .table-wrap { font-size: 0.78rem; }
+    td, th { padding: 10px 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="glow-orb one"></div>
+<div class="glow-orb two"></div>
+
+<div class="container">
+  <header>
+    <div class="logo-badge"><span class="dot"></span> Document Intelligence</div>
+    <h1>DocQuery</h1>
+    <p>Upload a document. Ask anything. Evaluate answers with OpenAI.</p>
+  </header>
+
+  <!-- Step 1: API Key -->
+  <div class="card">
+    <div class="card-label">① OpenAI Configuration</div>
+    <div class="input-group">
+      <input type="password" id="apiKey" class="styled-input" placeholder="sk-..." spellcheck="false" autocomplete="off">
+      <select id="modelSelect" class="styled-input" style="flex: 0 0 180px;">
+        <option value="gpt-4o-mini">gpt-4o-mini</option>
+        <option value="gpt-4o">gpt-4o</option>
+        <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+        <option value="gpt-4-turbo">gpt-4-turbo</option>
+      </select>
+    </div>
+    <p style="color: var(--muted); font-size: 0.78rem; margin-top: 10px;">🔒 Your API key is sent directly to OpenAI. Not stored anywhere.</p>
+  </div>
+
+  <!-- Step 2: Upload -->
+  <div class="card">
+    <div class="card-label">② Upload Document</div>
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.log,.csv">
+      <span class="upload-icon">📄</span>
+      <h3>Drop your file here or click to browse</h3>
+      <p>Supported formats</p>
+      <div class="file-types">
+        <span class="file-type-badge">PDF</span>
+        <span class="file-type-badge">DOCX</span>
+        <span class="file-type-badge">TXT</span>
+        <span class="file-type-badge">LOG</span>
+        <span class="file-type-badge">CSV</span>
+      </div>
+    </div>
+    <div class="doc-info" id="docInfo">
+      <div class="icon">✅</div>
+      <div class="meta">
+        <strong id="docName">—</strong>
+        <span id="docMeta" style="color: var(--muted); font-size: 0.8rem;"></span>
+        <div class="preview" id="docPreview"></div>
+      </div>
+    </div>
+    <div class="status-bar" id="uploadStatus"></div>
+  </div>
+
+  <!-- Step 3: Query -->
+  <div class="card">
+    <div class="card-label">③ Ask a Question</div>
+    <textarea id="questionInput" class="styled-input" placeholder="What is the main topic of this document? Who are the key people mentioned? What are the findings?..."></textarea>
+    <div class="row">
+      <button class="btn btn-primary" id="queryBtn" onclick="runQuery()" disabled>
+        <span>⚡</span> Run Query
+      </button>
+      <div style="flex: 1;"></div>
+    </div>
+    <div class="status-bar" id="queryStatus"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="resultsSection" style="display: none;">
+    <div class="card-label" style="margin-bottom: 14px;">④ Evaluation Results</div>
+
+    <!-- Stats -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat"><span class="stat-label">Total Queries</span><span class="stat-value blue" id="statTotal">0</span></div>
+      <div class="stat"><span class="stat-label">✓ Correct</span><span class="stat-value green" id="statCorrect">0</span></div>
+      <div class="stat"><span class="stat-label">✗ Incorrect</span><span class="stat-value red" id="statIncorrect">0</span></div>
+      <div class="stat"><span class="stat-label">Accuracy</span><span class="stat-value yellow" id="statAccuracy">—</span></div>
+      <div class="stat"><span class="stat-label">Tokens Used</span><span class="stat-value blue" id="statTokens">0</span></div>
+    </div>
+
+    <div style="height: 16px;"></div>
+
+    <div class="results-header">
+      <div class="card-label" style="margin-bottom: 0;">Query Results</div>
+      <div class="row-flex">
+        <span class="results-count" id="resultCount">0 results</span>
+        <button class="btn-sm" onclick="clearResults()">🗑 Clear All</button>
+        <button class="btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Query</th>
+            <th>Model Output</th>
+            <th>Model</th>
+            <th>Tokens</th>
+            <th>Correct / Incorrect</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <tr><td colspan="6" class="empty-state"><span class="emoji">🤔</span>No queries yet. Ask something above!</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentDocId = null;
+  let results = [];
+  let totalTokens = 0;
+
+  // Drag & drop
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  });
+
+  document.getElementById('fileInput').addEventListener('change', e => {
+    if (e.target.files[0]) uploadFile(e.target.files[0]);
+  });
+
+  function showStatus(id, type, html) {
+    const el = document.getElementById(id);
+    el.className = 'status-bar visible ' + type;
+    el.innerHTML = (type === 'loading' ? '<div class="spinner"></div>' : (type === 'error' ? '⚠️' : '✅')) + ' <span>' + html + '</span>';
+  }
+  function hideStatus(id) {
+    document.getElementById(id).className = 'status-bar';
+  }
+
+  async function uploadFile(file) {
+    const allowed = ['pdf','docx','txt','log','csv'];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!allowed.includes(ext)) {
+      showStatus('uploadStatus', 'error', `Unsupported file type: .${ext}`);
+      return;
+    }
+
+    showStatus('uploadStatus', 'loading', `Uploading and extracting text from <strong>${file.name}</strong>...`);
+    document.getElementById('docInfo').className = 'doc-info';
+
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      currentDocId = data.doc_id;
+      document.getElementById('docName').textContent = data.filename;
+      document.getElementById('docMeta').textContent = `${data.char_count.toLocaleString()} characters extracted`;
+      document.getElementById('docPreview').textContent = data.preview;
+      document.getElementById('docInfo').className = 'doc-info visible';
+      document.getElementById('uploadZone').querySelector('h3').textContent = '✓ File uploaded — drop another to replace';
+
+      hideStatus('uploadStatus');
+      checkQueryReady();
+    } catch (err) {
+      showStatus('uploadStatus', 'error', err.message);
+    }
+  }
+
+  function checkQueryReady() {
+    const ready = currentDocId && document.getElementById('apiKey').value.trim();
+    document.getElementById('queryBtn').disabled = !ready;
+  }
+
+  document.getElementById('apiKey').addEventListener('input', checkQueryReady);
+
+  async function runQuery() {
+    const apiKey = document.getElementById('apiKey').value.trim();
+    const question = document.getElementById('questionInput').value.trim();
+    const model = document.getElementById('modelSelect').value;
+
+    if (!apiKey) { showStatus('queryStatus', 'error', 'Please enter your OpenAI API key.'); return; }
+    if (!question) { showStatus('queryStatus', 'error', 'Please enter a question.'); return; }
+    if (!currentDocId) { showStatus('queryStatus', 'error', 'Please upload a document first.'); return; }
+
+    const btn = document.getElementById('queryBtn');
+    btn.disabled = true;
+    showStatus('queryStatus', 'loading', 'Querying OpenAI...');
+
+    try {
+      const res = await fetch('/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey, doc_id: currentDocId, question, model })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Query failed');
+
+      hideStatus('queryStatus');
+      addResult(data);
+      document.getElementById('questionInput').value = '';
+    } catch (err) {
+      showStatus('queryStatus', 'error', err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // Allow Ctrl+Enter in textarea
+  document.getElementById('questionInput').addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runQuery();
+  });
+
+  function addResult(data) {
+    const id = results.length + 1;
+    results.push({ id, question: data.question, answer: data.answer, model: data.model, tokens: data.tokens_used, verdict: data.verdict });
+    totalTokens += data.tokens_used;
+    renderTable();
+    document.getElementById('resultsSection').style.display = 'block';
+    updateStats();
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('resultsBody');
+    if (!results.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><span class="emoji">🤔</span>No queries yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = results.map((r, i) => `
+      <tr>
+        <td style="color: var(--muted); font-family: 'Space Mono', monospace; font-size: 11px;">${r.id}</td>
+        <td class="td-query">${escHtml(r.question)}</td>
+        <td class="td-answer">${escHtml(r.answer)}</td>
+        <td class="td-model">${r.model}</td>
+        <td class="td-tokens">${r.tokens.toLocaleString()}</td>
+        <td class="verdict-cell">
+          <span class="verdict-badge ${r.verdict}">
+            ${r.verdict === 'correct' ? '✓ Correct' : '✗ Incorrect'}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+    document.getElementById('resultCount').textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+  }
+
+  function updateStats() {
+    const correct = results.filter(r => r.verdict === 'correct').length;
+    const incorrect = results.filter(r => r.verdict === 'incorrect').length;
+    const rated = correct + incorrect;
+    const accuracy = rated > 0 ? Math.round(correct / rated * 100) + '%' : '—';
+    document.getElementById('statTotal').textContent = results.length;
+    document.getElementById('statCorrect').textContent = correct;
+    document.getElementById('statIncorrect').textContent = incorrect;
+    document.getElementById('statAccuracy').textContent = accuracy;
+    document.getElementById('statTokens').textContent = totalTokens.toLocaleString();
+  }
+
+  function clearResults() {
+    if (!results.length) return;
+    if (!confirm('Clear all results?')) return;
+    results = [];
+    totalTokens = 0;
+    renderTable();
+    updateStats();
+    document.getElementById('resultsSection').style.display = 'none';
+  }
+
+  function exportCSV() {
+    if (!results.length) return;
+    const rows = [['#', 'Query', 'Model Output', 'Model', 'Tokens Used', 'Verdict']];
+    results.forEach(r => rows.push([r.id, r.question, r.answer, r.model, r.tokens, r.verdict]));
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'docquery_results.csv';
+    a.click();
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
