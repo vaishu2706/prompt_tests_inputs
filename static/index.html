@@ -539,10 +539,9 @@
   }
 
   async function uploadFile(file) {
-    const allowed = ['pdf','docx','txt','log','csv'];
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (!allowed.includes(ext)) {
-      showStatus('uploadStatus', 'error', `Unsupported file type: .${ext}`);
+    const apiKey = document.getElementById('apiKey').value.trim();
+    if (!apiKey) {
+      showStatus('uploadStatus', 'error', 'Please enter your OpenAI API key first.');
       return;
     }
 
@@ -551,6 +550,7 @@
 
     const fd = new FormData();
     fd.append('file', file);
+    fd.append('api_key', apiKey);  // needed to embed document on upload
     try {
       const res = await fetch('/upload', { method: 'POST', body: fd });
       const data = await res.json();
@@ -558,7 +558,7 @@
 
       currentDocId = data.doc_id;
       document.getElementById('docName').textContent = data.filename;
-      document.getElementById('docMeta').textContent = `${data.char_count.toLocaleString()} characters extracted`;
+      document.getElementById('docMeta').textContent = `${data.char_count.toLocaleString()} characters · ${data.chunk_count} chunks indexed`;
       document.getElementById('docPreview').textContent = data.preview;
       document.getElementById('docInfo').className = 'doc-info visible';
       document.getElementById('uploadZone').querySelector('h3').textContent = '✓ File uploaded — drop another to replace';
